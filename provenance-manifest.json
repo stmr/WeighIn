@@ -8,11 +8,11 @@
     },
     {
       "path": "bundled/comment-action.js",
-      "sha256": "fa76a82b443f072be6401fe6ed12d3387de0e25f180a78a1b8557a850c976e04"
+      "sha256": "b1c4910444560b90227860fed08135920b30e2644db12db5a70aefe647065175"
     },
     {
       "path": "bundled/index.js",
-      "sha256": "674f269268cd250f4c2de1ce4ac580996e7bcca1ea1a1dbafd61558a52ff9ff9"
+      "sha256": "4c0f1a1e2f98882c44f91e7db61ef999b1f182abbfe73f12c8dc672201ec932f"
     },
     {
       "path": "native/simulation/Cargo.lock",
@@ -64,7 +64,7 @@
     },
     {
       "path": "src/comment.ts",
-      "sha256": "84404c770f2314842c6a67f399e5ea54845cfe70a7c4c15ef1c182df27612e9c"
+      "sha256": "215cf5db52a005055b41f247c768ba06026eb3998df709f4a76df2da937ea72a"
     },
     {
       "path": "src/config.ts",
@@ -116,7 +116,7 @@
     },
     {
       "path": "src/simulation.ts",
-      "sha256": "1425d0394cbbe19bf6a0be68b5422044d9be95a089e9bffee2df67f8db20c098"
+      "sha256": "942be0034b62d8ca073984cef03452b4fb9d404ac895dddcf39597949d526a00"
     },
     {
       "path": "src/source-account.ts",

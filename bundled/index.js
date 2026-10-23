@@ -55551,7 +55551,6 @@ async function resolveExpectedAuthor(octokit, mode) {
   );
 }
 async function upsertPrComment(token, numberOrBody, bodyOrOptions, maybeOptions) {
-  const github = await Promise.resolve().then(() => (init_github(), github_exports));
   let body;
   let prNumberInput;
   let options;
@@ -55564,6 +55563,18 @@ async function upsertPrComment(token, numberOrBody, bodyOrOptions, maybeOptions)
     prNumberInput = void 0;
     options = bodyOrOptions ?? {};
   }
+  if (typeof body !== "string" || !/\S/.test(body)) {
+    throw new Error("Report body is empty or whitespace-only.");
+  }
+  if (!body.includes(COMMENT_MARKER)) {
+    throw new Error(`Report body is missing ${COMMENT_MARKER}.`);
+  }
+  if (!/^## .*WeighIn Benchmark Report\s*$/m.test(body)) {
+    throw new Error(
+      "Report body is missing the WeighIn Benchmark Report heading."
+    );
+  }
+  const github = await Promise.resolve().then(() => (init_github(), github_exports));
   const core4 = options.core ?? await Promise.resolve().then(() => __toESM(require_core()));
   const mode = options.commentAuthorMode ?? "github-actions";
   if (mode !== "github-actions" && mode !== "authenticated-user") {
