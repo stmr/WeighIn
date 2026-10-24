@@ -108,7 +108,7 @@ const aggregateBudgetConfigSchema = z
   .object({
     description: z.string().optional(),
     members: z.array(benchmarkSelectorSchema).min(1),
-    limits: z.record(z.enum(METRIC_KEYS), percentage).optional(),
+    limits: z.partialRecord(z.enum(METRIC_KEYS), percentage).optional(),
     thresholds: metricRules.optional(),
   })
   .strict();
@@ -116,12 +116,18 @@ const configSchema = z
   .object({
     limits: z
       .object({
-        global: z.record(z.enum(METRIC_KEYS), percentage).optional(),
+        global: z.partialRecord(z.enum(METRIC_KEYS), percentage).optional(),
         functions: z
-          .record(z.string().min(1), z.record(z.enum(METRIC_KEYS), percentage))
+          .record(
+            z.string().min(1),
+            z.partialRecord(z.enum(METRIC_KEYS), percentage),
+          )
           .optional(),
         aggregates: z
-          .record(z.string().min(1), z.record(z.enum(METRIC_KEYS), percentage))
+          .record(
+            z.string().min(1),
+            z.partialRecord(z.enum(METRIC_KEYS), percentage),
+          )
           .optional(),
       })
       .strict()
@@ -464,11 +470,12 @@ export function enforceThresholds(
   }
   if (
     (global.fail_on_any_regression ||
-      GLOBAL_RULE_MAP.some(({ field }) => global[field] !== undefined)) &&
+      GLOBAL_RULE_MAP.some(({ field }) => global[field] !== undefined) ||
+      Object.keys(globalLimits).length > 0) &&
     comparedNames.size === 0
   ) {
     throw new Error(
-      "Cannot evaluate global policy: no matched BASE/HEAD benchmarks",
+      "Cannot evaluate configured global policy or limits: no matched BASE/HEAD benchmarks",
     );
   }
 
