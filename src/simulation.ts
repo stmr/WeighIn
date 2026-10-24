@@ -558,12 +558,8 @@ export async function simulateSnapshot(
       signal,
     );
   } catch (failure) {
-    // The helper reports a structured failure envelope on stdout. Surface its
-    // status and message instead of the generic helper error text.
     const envelope = parseHelperFailure(failure);
     if (envelope && failure instanceof Error) {
-      // Keep the original error (and its stdout) so the snapshot capture path can
-      // still read the envelope's captured keys.
       failure.message = helperFailureMessage(envelope);
     }
     throw failure;
