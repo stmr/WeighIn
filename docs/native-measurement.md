@@ -1,4 +1,4 @@
-# Native simulation measurement (schema 4)
+# Native simulation measurement (schema 5)
 
 WeighIn now measures consumed CPU and memory with the official
 `soroban-simulation` / `soroban-env-host` 28.0.1 libraries. The initial supported
@@ -139,12 +139,12 @@ Measurement and helper operations accept an optional `signal?: AbortSignal` acro
 - **RPC calls and polling**: `callRpc`, `waitForTransaction`, and `submitAndConfirm` link the caller's cancellation signal with internal timeouts via `AbortSignal.any`. Polling intervals abort promptly on signal trigger.
 - **Native helper execution**: `simulateSnapshot` and `execute` pass `signal` to Node's `execFile`, which terminates the spawned native helper child process promptly (`SIGTERM` / `SIGKILL`) on abort.
 - **Simulation and transient recovery**: `measureInvocation` aborts transient captive-core retry delays immediately upon cancellation and halts retry loops.
-- **Resource protection**: Caller-provided key files (`keyFile`) are preserved on cancellation; temporary deployment keys and scratch files are cleaned up.
+- **Resource protection**: Caller-provided key files (`keyFile`) are never created, modified or deleted by the API, whether a run succeeds, fails or is cancelled. When no `keyFile` is given, the API creates a private temporary directory for the deployer key and removes it when the run finishes, fails or is cancelled, so each such run uses a fresh deployer account. Scratch files are cleaned up.
 - **Fail-closed guarantees**: Cancelled measurements throw explicit cancellation errors (`AbortError`) and never produce synthetic zero or fallback benchmarks.
 
 ## Schema migration
 
-`ContractBenchmark.schema_version` is now **4**. See the
+`ContractBenchmark.schema_version` is now **5**. See the
 [metric audit and migration](metric-provenance.md) for the complete mapping. The stable comparison tuple from
 schema 2 remains `(fixture_id, logical_id, function_name, case_id)`; runtime
 `contract_id` and WASM hash remain diagnostics.
@@ -167,6 +167,11 @@ network cap: its measured value has `limit: null` and `limit_reason`. Other meas
 metrics provide `limit_source` from captured configuration. These meanings are
 spelled out in the metric audit; footprint counts are not host-call counts.
 
+Schema 5 validates exact approved source and cap labels per metric; a pair of
+matching but fabricated labels is rejected. Historical schema-4 records remain
+valid as schema 4 and are not rewritten. Schema versions cannot be mixed, so
+remeasure both revisions with the current producer when migrating.
+
 Consumers must handle null consumption/limits. Diff records expose
 `availability: comparable | unavailable`; unavailable comparisons have null
 `delta`/`pct` and a reason, with no invented improvement/regression.
@@ -176,9 +181,8 @@ ledger, seed and auth settings, plus a resource-limit hash. Diff/report records 
 
 Existing schema-2 results can compare with other schema-2 results, and legacy
 results retain their old runtime matching. Schema 2 is never silently compared
-with newer schemas: earlier numeric fields do not establish the same source semantics.
-Schema-3 records retain their existing behavior when compared to schema 3; mixing
-schema 3 and 4 fails explicitly.
+with newer schemas: earlier numeric fields do not establish the same source
+semantics. Schema 3, 4, and 5 remain separate envelopes and cannot be mixed.
 Unmatched records are validated too. New/removed benchmark behavior is unchanged.
 
 ## Policies and reports
@@ -226,7 +230,7 @@ See [integration evidence](experiments/native-integration/verification.json),
 [the regression report](experiments/native-integration/report.md), and the explicit
 live harness `tests/experiments/verify-integration.cjs`.
 
-The historical schema-3 evidence below remains unchanged. Current schema-4 proof
+The historical schema-3 evidence below remains unchanged. The previous schema-4 proof
 and raw IO/event verification are linked from the metric audit.
 
 The harness runs genuine prebuilt bundled-contract BASE/temporary persistent-write
@@ -251,3 +255,21 @@ The temporary HEAD preserves `hello(Env, Symbol)` and adds a persistent write
 before its unchanged return. Private deployer keys remain in temporary directories
 and are never copied into evidence. Frozen-snapshot native tests replay the prior
 captured proof offline; they do not establish clean-build/live-network determinism.
+
+## Reusing an existing deployment
+
+The contract ID is derived from the deployer account and the WASM hash, so each
+run first looks for an existing instance. If none exists, WeighIn deploys as
+before. If one exists, WeighIn reads the remaining TTL of both the contract
+instance and its WASM code entry and requires each to stay live for at least
+`minTtlLedgers` more ledgers (a `runMeasurement` option; default 17,280, about
+one day at 5 s per ledger; it must be a non-negative integer).
+
+If either entry is below that window, the code entry is missing or archived, or
+TTL metadata is unavailable, the run fails with an error naming the entry, the
+latest ledger, its live-until ledger and the required window. The check runs
+before any transaction is prepared or any simulation starts. WeighIn does not
+extend TTLs, redeploy over the existing contract, or restore archived state, so
+caller-owned ledger state is never modified to hide an expiry. To proceed, extend
+the TTL yourself, or use a different deployer key (`keyFile`), which yields a new
+contract ID.
