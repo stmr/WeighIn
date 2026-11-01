@@ -11,6 +11,44 @@ import { Violation, PolicyOrigin, EffectivePolicyReport } from "./threshold";
 
 export const COMMENT_MARKER = "<!-- weighin-report -->";
 
+export interface CommentInfo {
+  id: number;
+  body?: string | null;
+  user?: { id?: number | null } | null;
+}
+
+export async function findReportComment(
+  octokit: any,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  marker: string = COMMENT_MARKER,
+  expectedAuthorId?: number,
+): Promise<CommentInfo | undefined> {
+  for await (const response of octokit.paginate.iterator(
+    octokit.rest.issues.listComments,
+    {
+      owner,
+      repo,
+      issue_number: issueNumber,
+    },
+  )) {
+    const comments: CommentInfo[] = response.data;
+    const match = comments.find((comment) => {
+      const matchesMarker = comment.body?.includes(marker);
+      if (!matchesMarker) return false;
+      if (expectedAuthorId !== undefined) {
+        return comment.user?.id === expectedAuthorId;
+      }
+      return true;
+    });
+    if (match) {
+      return match;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Which identity should own the report comment.
  *
@@ -122,6 +160,8 @@ export async function upsertPrComment(
   bodyOrOptions?: string | UpsertPrCommentOptions,
   maybeOptions?: UpsertPrCommentOptions,
 ): Promise<void> {
+  const github = await import("@actions/github");
+
   // Disambiguate overloads
   let body: string;
   let prNumberInput: number | undefined;
@@ -139,21 +179,6 @@ export async function upsertPrComment(
     options = (bodyOrOptions as UpsertPrCommentOptions | undefined) ?? {};
   }
 
-  // Validate the bounded report artifact before any API access or mutation.
-  if (typeof body !== "string" || !/\S/.test(body)) {
-    throw new Error("Report body is empty or whitespace-only.");
-  }
-  if (!body.includes(COMMENT_MARKER)) {
-    throw new Error(`Report body is missing ${COMMENT_MARKER}.`);
-  }
-  if (!/^## .*WeighIn Benchmark Report\s*$/m.test(body)) {
-    throw new Error(
-      "Report body is missing the WeighIn Benchmark Report heading.",
-    );
-  }
-  // The GitHub SDK is import-only ESM; static imports become require() in this
-  // CommonJS package and would break report-only consumers.
-  const github = await import("@actions/github");
   const core = options.core ?? (await import("@actions/core"));
   const mode: CommentAuthorMode = options.commentAuthorMode ?? "github-actions";
 
@@ -177,26 +202,17 @@ export async function upsertPrComment(
 
   const octokit = github.getOctokit(token);
   const { owner, repo } = github.context.repo;
-
   // Resolve expected author before touching comments.
   const expectedAuthor = await resolveExpectedAuthor(octokit, mode);
 
-  const { data: comments } = await octokit.rest.issues.listComments({
+  const existing = await findReportComment(
+    octokit,
     owner,
     repo,
-    issue_number: prNumber,
-  });
-
-  const existing = comments.find(
-    (comment: {
-      id: number;
-      body?: string | null;
-      user?: { id?: number | null } | null;
-    }) =>
-      comment.body?.includes(COMMENT_MARKER) &&
-      comment.user?.id === expectedAuthor.id,
+    prNumber,
+    COMMENT_MARKER,
+    expectedAuthor.id,
   );
-
   if (existing) {
     await octokit.rest.issues.updateComment({
       owner,
