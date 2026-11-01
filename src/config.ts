@@ -273,6 +273,35 @@ export const BoundInvocationArgSchema = z
   })
   .strict();
 
+function formatZodIssueMessage(issue: z.ZodError["issues"][number]): string {
+  if (issue.code === "unrecognized_keys") {
+    return `Unrecognized key(s) in object: ${issue.keys
+      .map((key) => `'${key}'`)
+      .join(", ")}`;
+  }
+  if (
+    issue.code === "invalid_type" &&
+    issue.message.endsWith("received undefined")
+  ) {
+    return "Required";
+  }
+  if (
+    issue.code === "invalid_value" &&
+    "values" in issue &&
+    Array.isArray(issue.values)
+  ) {
+    return "Invalid option";
+  }
+  if (
+    issue.code === "too_small" &&
+    issue.origin === "number" &&
+    issue.minimum === 0
+  ) {
+    return "Number must be >= 0";
+  }
+  return issue.message;
+}
+
 // Dispatch on the binding key so literal arguments keep their own diagnostics.
 const TopLevelInvocationArgSchema = z.unknown().transform((val, ctx) => {
   const schema =
@@ -282,7 +311,11 @@ const TopLevelInvocationArgSchema = z.unknown().transform((val, ctx) => {
   const result = schema.safeParse(val);
   if (!result.success) {
     result.error.issues.forEach((issue) =>
-      ctx.addIssue(issue as Parameters<typeof ctx.addIssue>[0]),
+      ctx.addIssue({
+        code: "custom",
+        path: issue.path,
+        message: formatZodIssueMessage(issue),
+      }),
     );
     return z.NEVER;
   }
@@ -323,7 +356,7 @@ export function formatZodError(error: z.ZodError, fileName: string): string {
   const lines = [`Invalid WeighIn configuration in ${fileName}:`];
   for (const issue of error.issues) {
     const path = issue.path.join(".");
-    lines.push(`- ${path || "root"}: ${issue.message}`);
+    lines.push(`- ${path || "root"}: ${formatZodIssueMessage(issue)}`);
   }
   return lines.join("\n");
 }
