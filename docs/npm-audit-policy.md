@@ -119,6 +119,13 @@ The lockfile resolves transitive `undici` to `6.29.1`, within the existing
 This needs no new direct dependency or override. The audit threshold and
 failure propagation remain unchanged.
 
+## follow-redirects remediation
+
+[GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p)
+affects `follow-redirects` 1.16.0 through 1.16.1. The lockfile resolves
+version 1.16.2 within axios's existing `^1.16.0` range. The audit gate is
+unchanged; the dependency inventory and bundled actions are regenerated.
+
 ## Distinction from native and image security
 
 This step covers only the **npm lock graph** (`package-lock.json`). It does
